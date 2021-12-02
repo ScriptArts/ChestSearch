@@ -28,7 +28,7 @@ def _check_block(block: Block, original_base_name: str,
     return False
 
 
-class EmptyChestSearch(wx.Panel, DefaultOperationUI):
+class ChestSearch(wx.Panel, DefaultOperationUI):
     def __init__(
             self, parent: wx.Window, canvas: "EditCanvas", world: "BaseLevel", options_path: str
     ):
@@ -45,9 +45,9 @@ class EmptyChestSearch(wx.Panel, DefaultOperationUI):
             self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP, size=(200, 100)
         )
         self._sizer.Add(self._description, 0, wx.ALL | wx.EXPAND, 5)
-        self._description.SetLabel("アイテムが格納可能なタイルエンティティのうち、\n" +
-                                   "アイテムが格納されていないタイルエンティティをワールドから全て検索します。\n" +
-                                   "検索した内容はEmptyChestSearchディレクトリにCSV形式で出力します。")
+        self._description.SetLabel("アイテムが格納可能なタイルエンティティをワールドから全て検索します。\n" +
+                                   "検索した内容はEmptyChestSearchディレクトリにCSV形式で出力します。\n" +
+                                   "ルートテーブルが設定されているかや、中身が空であるか等も出力します。")
         self._description.Fit()
 
         self._run_button = wx.Button(self, label="検索開始")
@@ -78,7 +78,7 @@ class EmptyChestSearch(wx.Panel, DefaultOperationUI):
         count = 0
         file_out_list = []
         now = datetime.now()
-        directory_name = "EmptyChestSearch"
+        directory_name = "ChestSearch"
         filepath = directory_name + "/" + now.strftime("%Y%m%d%H%M%S") + ".csv"
 
         # 全てのディメンションのチャンク数を取得
@@ -94,15 +94,26 @@ class EmptyChestSearch(wx.Panel, DefaultOperationUI):
                 chunk = world.get_chunk(cx, cz, dimension)
 
                 for blockEntity in chunk.block_entities:
-                    snbt = blockEntity.nbt.to_snbt()
-                    if "Items: []" in snbt:
-                        x = str(blockEntity.x)
-                        y = str(blockEntity.y)
-                        z = str(blockEntity.z)
-                        base_name = blockEntity.base_name
+                    if not blockEntity.nbt["utags"].__contains__("Items"):
+                        continue
 
-                        print("X:" + x + " Y:" + y + " Z:" + z + " " + dimension + " " + base_name + " " + snbt)
-                        file_out_list.append((x, y, z, dimension, base_name))
+                    snbt = blockEntity.nbt.to_snbt()
+                    x = str(blockEntity.x)
+                    y = str(blockEntity.y)
+                    z = str(blockEntity.z)
+                    is_not_empty = 0
+                    is_loottable = 0
+
+                    if len(blockEntity.nbt["utags"]["Items"]) > 0:
+                        is_not_empty = 1
+
+                    if blockEntity.nbt["utags"].__contains__("LootTable") and blockEntity.nbt["utags"]["LootTable"] != "":
+                        is_loottable = 1
+
+                    base_name = blockEntity.base_name
+
+                    print("X:" + x + " Y:" + y + " Z:" + z + " " + dimension + " " + base_name + " " + snbt)
+                    file_out_list.append((x, y, z, dimension, base_name, str(is_not_empty), str(is_loottable)))
 
                 count += 1
                 yield count / chunk_count
@@ -115,14 +126,14 @@ class EmptyChestSearch(wx.Panel, DefaultOperationUI):
 
         # 結果をファイル出力
         with open(filepath, "w") as f:
-            f.write("x,y,z,dimension,block_name\n")
-            for x, y, z, dimension, base_name, in file_out_list:
-                f.write(x + "," + y + "," + z + "," + dimension + "," + base_name + "\n")
+            f.write("x,y,z,dimension,ブロックの種類,中身の有無,ルートテーブルの有無\n")
+            for x, y, z, dimension, base_name, is_not_empty, is_loottable, in file_out_list:
+                f.write(x + "," + y + "," + z + "," + dimension + "," + base_name + "," + is_not_empty + "," + is_loottable + "\n")
 
         wx.MessageBox("検索が完了しました。\n出力先：" + filepath, "検索完了")
 
 
 export = {
-    "name": "空チェスト検索",  # the name of the plugin
-    "operation": EmptyChestSearch,  # the actual function to call when running the plugin
+    "name": "チェスト検索",  # the name of the plugin
+    "operation": ChestSearch,  # the actual function to call when running the plugin
 }
