@@ -115,6 +115,9 @@ class ChestSearch(wx.Panel, DefaultOperationUI):
                     print("X:" + x + " Y:" + y + " Z:" + z + " " + dimension + " " + base_name + " " + snbt)
                     file_out_list.append((x, y, z, dimension, base_name, str(is_not_empty), str(is_loottable)))
 
+                if count % 1000 == 0:
+                    world.unload_unchanged()
+
                 count += 1
                 yield count / chunk_count
 
